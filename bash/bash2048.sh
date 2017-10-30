@@ -11,14 +11,13 @@ declare -i moves     # stores number of possible moves to determine if player lo
 declare ESC=$'\e'    # escape byte
 declare header="Bash 2048 "
 
-declare -i start_time=$(date +%s)
 declare -i high_flag=0
 #default config
 declare -i board_size=4
 declare -i target=2048
 declare -i reload_flag=0
 declare config_dir="`pwd`/.bash2048"
-
+declare -i start_time
 #for colorizing numbers
 declare -a colors
 colors[2]=33         # yellow text
@@ -34,8 +33,8 @@ colors[1024]="35m\033[7"      # purple background
 colors[2048]="31m\033[7"      # red background (won with default target)
 
 exec 3>/dev/null     # no logging by default
-
-trap "end_game 0 1" INT #handle INT signal
+declare -i secs
+trap "end_game 2 4" INT #handle INT signal
 #highscore_distribution
 function high {
 case $1 in
@@ -43,9 +42,10 @@ case $1 in
 	1) echo "$score">>Difficult.txt;;
 	2) echo "$score">>Moderate.txt;;
 	3)echo "$score">>Easy.txt;;
+	4)echo "$score">>Timer.txt;;
 esac
 }
-
+declare -i end
 #simplified replacement of seq command
 function _seq {
   local cur=1
@@ -64,12 +64,21 @@ function _seq {
     let cur+=inc
   done
 }
-
 # print currect status of the game, last added pieces are marked red
 function print_board {
   clear
   printf "$header pieces=$pieces target=$target score=$score\n"
-  printf "Board status:\n" >&3
+  let end=$(date +%s)
+	#echo "$end"
+if ((end-$1 >=1)) 
+then 
+((secs=end-$1))
+printf "Timer : %02d:%02d:%02d" $((secs/3600)) $(( (secs/60)%60)) $((secs%60))
+else
+printf "Timer : %02d:%02d:%02d" $((secs/3600)) $(( (secs/60)%60)) $((secs%60))
+fi 
+  
+  #printf "Board status:\n" >&3
   printf "\n"
   printf '/------'
   for l in $(_seq 1 $index_max); do
@@ -88,7 +97,7 @@ function print_board {
         printf " %4d |" ${board[l*$board_size+m]} >&3
       else
         printf '      |'
-        printf '      |' >&3
+        #printf '      |' >&3
       fi
     done
     let l==$index_max || {
@@ -97,7 +106,7 @@ function print_board {
         printf '+------'
       done
       printf '|\n'
-      printf '\n' >&3
+      #printf '\n' >&3
     }
   done
   printf '\n\\------'
@@ -105,6 +114,11 @@ function print_board {
     printf '+------'
   done
   printf '/\n'
+if ((high_flag==4 && secs>=90))
+then
+end_game 0 1
+fi
+
 }
 
 # Generate new piece on the board
@@ -178,7 +192,10 @@ function push_pieces {
   let "${board[$first]}==${board[second]}" && { 
     if test -z $5; then
       let board[$first]*=2
-      let "board[$first]==$target" && end_game 1
+     end_time=$(date +"%s")
+	#let total_time=end_time-start_time
+      #let total_time==90 && "board[$first]==$target" && end_game 1 0
+      let "board[$first]==$target" && end_game 1 0
       let board[$second]=0
       let pieces-=1
       let change=1
@@ -214,11 +231,11 @@ function check_moves {
 
 function key_react {
   let change=0
-  read -d '' -sn 1
+  read -d '' -sn 1 -t 0.9
   test "$REPLY" = "$ESC" && {
-    read -d '' -sn 1 -t1
+    read -d '' -sn 1 
     test "$REPLY" = "[" && {
-      read -d '' -sn 1 -t1
+      read -d '' -sn 1 
       case $REPLY in
         A) apply_push up;;
         B) apply_push down;;
@@ -254,6 +271,7 @@ function save_game {
   echo "$score" > "$config_dir/score"
   echo "$first_round" > "$config_dir/first_round"
   echo "$high_flag" > "$config_dir/high_flag"
+  echo "$secs">"$config_dir/secs"
 }
 
 
@@ -270,18 +288,24 @@ function reload_game {
   first_round=(`cat "$config_dir/first_round"`)
   target=(`cat "$config_dir/target"`)
   score=(`cat "$config_dir/score"`)
-  high_flag=(`cat "$config_dir/high_flag"`)
+  high_flag=(`cat "$config_dir/high_flag"`) 
+  secs=(`cat "$config_dir/secs"`)
   fields_total=board_size*board_size
   index_max=board_size-1
 }
 
 function end_game {
   # count game duration
-  end_time=$(date +%s) 
+   end_time=$(date +%s) 
   let total_time=end_time-start_time
-  
-  print_board
-  printf "Your score: $score\n"
+  if (($2==1))
+  then
+  echo "hi">&3
+  #printf "Your score: $score\n"
+  else
+  print_board $start_time
+  fi
+ printf "Your score: $score\n"
   
   printf "This game lasted "
 
@@ -291,33 +315,43 @@ function end_game {
   else
       date -u -r ${total_time} +%T
   fi
-  
   stty echo
-  let $1 && {
-    printf "Congratulations you have achieved $target\n"
-   high $high_flag
+  if (($1==1)) 
+  then 
+  printf "Congratulations you have achieved $target\n"
+   high $high_flag $total_time
+   if test  -d $config_dir ;then
+  	rm -rf "$config_dir"
+	fi
     exit 0
-  }
-  let test -z $2 && {
-    read -n1 -p "Do you want to overwrite saved game? [y|N]: "
+  fi
+if (($2==4))
+then  
+  read -n1 -t10000 -p "Press Y/y to save game. "
+   #echo $REPLY
     test "$REPLY" = "Y" || test "$REPLY" = "y" && {
       save_game
-      printf "\nGame saved.\n"
-	
-      exit 0
-    }
-    test "$REPLY" != "Y" && {
-      printf "\nGame not saved.\n"
+      printf "\nGame saved.Use Resume option in main menu to resume where u left\n"
+	exit 0  
+	}    
+      printf "\nGame not saved.but score stored\n"
 	if test  -d $config_dir ;then
-	rm -rf "$config_dir"
+  	rm -rf "$config_dir"
 	fi
-	high $high_flag      
-	exit 0
-    }
-  }
-  printf "\nYou have lost, better luck next time.\033[0m\n"
+	high $high_flag
+      exit 0
+ fi
+if (($1 == 0))
+then
+ printf "\nYou have lost, better luck next time.\033[0m\n"
   high $high_flag
+  if test  -d $config_dir ;then
+  	rm -rf "$config_dir"
+	fi
   exit 0
+fi 
+  
+  
 }
 
 function help {
@@ -372,19 +406,30 @@ if test $reload_flag = "1"; then
 if test  -d $config_dir ;
 then
   reload_game
+start_time=$(date +%s)
+echo "$start_time"
+((start_time=start_time-secs))
+echo "$start_time"
 else
 echo "NO LAST SAVED GAME"
 exit 0
 fi
+else
+start_time=$(date +%s)
+let secs=0
 fi
-
-while true; do
-  print_board
+#let start=$(date +%s)
+while true
+do
+  print_board $start_time
   key_react
   let change && generate_piece
   first_round=-1
   let pieces==fields_total && {
    check_moves
-   let moves==0 && end_game 0 #lose the game
+   let moves==0 && end_game 0 1 #lose the game
   }
 done
+
+
+

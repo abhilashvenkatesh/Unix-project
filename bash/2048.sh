@@ -2,7 +2,7 @@ select option in NEWGAME INSTRUCTIONS HELP RESUME HIGHSCORES  EXIT
 do
 clear 
 case $option in
-	NEWGAME)echo -e "select mode \n1)Practice\n2)Competition"
+	NEWGAME)echo -e "select mode \n1)Practice\n2)Competition\n3)Time Trial Mode"
 		read mode
 		case $mode in 
 		1)
@@ -31,6 +31,10 @@ case $option in
 				bash bash2048.sh -c 3 -t $target -b $board;;
 			    *)echo "ENTER CORRECT OPTION";;		  
 			   esac;;
+		  3)((target=2048))
+		    ((board=4))
+		   bash bash2048.sh -c 4 -t $target -b $board ;;
+		   
 		 *)echo "ENTER CORRECT OPTION";;
 	          esac;;
 	INSTRUCTIONS)
@@ -43,7 +47,7 @@ case $option in
     echo " "
     echo -e "When two tiles with the same number touch, they merge into one!\nTest your mind and skills. Let see how quick you can play 2048 game.\nAll you need to do is add the two tiles with the same number.\nThe two tiles with the same number will merge or add up.\nThink and strategize to get the highest score.\nSo join the numbers and get to the target(default 2048) tile!";;
    HIGHSCORES) clear
-	    echo -e "select level\n1)Difficult\n2)Moderate\n3)Easy\n" 
+	    echo -e "select level\n1)Difficult\n2)Moderate\n3)Easy\n4)Timer mode\n" 
 		  read level
 		  echo -e "--------------------------TOP FIVE HIGHSCORES------------------------------\n"
 		  echo "position score"
@@ -51,6 +55,7 @@ case $option in
 			    1)sort -nro Difficult.txt Difficult.txt;cat -n Difficult.txt|head -n 5;;
 			    2)sort -nro Moderate.txt Moderate.txt; cat -n Moderate.txt|head -n 5;;
 			    3) sort -nro Easy.txt Easy.txt;cat -n Easy.txt|head -n 5;;
+			    4)sort -nro Timer.txt Timer.txt;cat -n Timer.txt|head -n 5;;
 			    *)echo "ENTER CORRECT OPTION";;
 			   esac;;
 	          
@@ -62,7 +67,7 @@ case $option in
 		echo -e "  2)COMPETITION mode : Player can play in any of easy,moderate,difficult levels of the game\n";;
 	RESUME) bash bash2048.sh -r;;	
 	
-	EXIT) return;;
+	EXIT)exit 0;;
 	   *)echo "ENTER CORRECT OPTION";;
 esac
 echo -e "\n\nPRESS ENTER TO GO TO MENU\n\n"
